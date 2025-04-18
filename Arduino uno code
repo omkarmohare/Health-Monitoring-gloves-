@@ -1,0 +1,60 @@
+// File: self_care_gloves.ino
+
+#include <Wire.h>
+#include <Adafruit_MLX90614.h>
+#include "MAX30105.h"
+#include <LiquidCrystal_I2C.h>
+#include "heartRate.h"
+
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+MAX30105 particleSensor;
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+void setup() {
+  Serial.begin(9600);
+  lcd.begin(20, 4);
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Self-Care Gloves");
+
+  mlx.begin();
+
+  if (!particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {
+    Serial.println("MAX30102 not found. Check wiring.");
+    while (1);
+  }
+
+  particleSensor.setup();
+  particleSensor.setPulseAmplitudeRed(0x0A);
+  particleSensor.setPulseAmplitudeGreen(0);
+
+  delay(2000);
+}
+
+void loop() {
+  float temp = mlx.readObjectTempC();
+  lcd.setCursor(0, 1);
+  lcd.print("Temp: ");
+  lcd.print(temp);
+  lcd.print(" C");
+
+  long irValue = particleSensor.getIR();
+  if (irValue > 50000) {
+    byte result = checkForBeat(irValue);
+    if (result == 1) {
+      static unsigned long lastBeat = 0;
+      unsigned long delta = millis() - lastBeat;
+      lastBeat = millis();
+      int bpm = 60000 / delta;
+
+      lcd.setCursor(0, 2);
+      lcd.print("BPM: ");
+      lcd.print(bpm);
+    }
+  }
+
+  lcd.setCursor(0, 3);
+  lcd.print("Monitoring...");
+
+  delay(1000);
+}
